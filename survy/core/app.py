@@ -107,7 +107,7 @@ class App:
 
     @classmethod
     def setup(cls, base_path, config_file):
-        cls.config = yaml.load(open(config_file, 'r'))
+        cls.config = yaml.load(open(base_path + '/' + config_file, 'r'))
         cls.base_path = base_path
 
     @classmethod

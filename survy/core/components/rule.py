@@ -320,6 +320,9 @@ class RuleRepo:
                         )
                         condition_instances.append(condition_instance)
 
+            if 'name' not in rule_info:
+                rule_info['name'] = rule_code
+
             rule = Rule(
                 code=rule_code,
                 name=rule_info['name'],
@@ -338,6 +341,12 @@ class RuleRepo:
 class RuleManager(Component):
     COMPONENT_TYPE = 'rule-manager'
 
+    INTERCOM_MESSAGE_RULE_TRIGGERED_PREFIX = 'rule-triggered-'
+
+    def _trigger_rule_event(self, rule: Rule, message: Message):
+        self.send_intercom_message(
+            self.INTERCOM_MESSAGE_RULE_TRIGGERED_PREFIX + rule.code, message.message_payload)
+
     def _on_intercom_message(self, message: Message) -> Reply:
         event = Event.create_from_message(message)
 
@@ -352,6 +361,11 @@ class RuleManager(Component):
 
                 threading.Thread(target=rule.fire_actions, kwargs={
                     'variables': variables
+                }).start()
+
+                threading.Thread(target=self._trigger_rule_event, kwargs={
+                    'rule': rule,
+                    'message': message
                 }).start()
 
         return Component._on_intercom_message(self, message)

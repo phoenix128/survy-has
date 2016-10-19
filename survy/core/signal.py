@@ -76,13 +76,9 @@ class SignalManager(Component):
         return self._learning_signal is not None
 
     def _on_learn_start(self, message: Message) -> Reply:
-        payload = message.get_message_payload()
+        payload = message.message_payload
 
         self._last_learning_signal = None
-        params_fail = self.check_required_parameters(payload, ['device', 'sub'])
-        if params_fail:
-            return params_fail
-
         self._learning_signal = Signal(
             code='',
             manager=None,
@@ -293,19 +289,20 @@ class SignalRepo:
             Log.error("Loading signals information failed from " + signals_file)
             return
 
-        for device_code, device_info in signals.items():
-            for sub_code, sub_info in device_info['subs'].items():
-                signal = Signal(
-                    manager=App.components.get(sub_info['manager']),
-                    code=sub_info['code'],
-                    dump=sub_info['dump'],
-                    device_code=device_code,
-                    device_name=device_info['name'],
-                    sub_code=sub_code,
-                    sub_name=sub_info['name'],
-                )
+        if signals is not None:
+            for device_code, device_info in signals.items():
+                for sub_code, sub_info in device_info['subs'].items():
+                    signal = Signal(
+                        manager=App.components.get(sub_info['manager']),
+                        code=sub_info['code'],
+                        dump=sub_info['dump'],
+                        device_code=device_code,
+                        device_name=device_info['name'],
+                        sub_code=sub_code,
+                        sub_name=sub_info['name'],
+                    )
 
-                cls._signals.append(signal)
+                    cls._signals.append(signal)
 
     @classmethod
     def get_by_code(cls, device_code, sub_code) -> Signal:
