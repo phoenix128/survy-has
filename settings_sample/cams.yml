@@ -1,0 +1,19 @@
+my_cam:
+  name: "MyCam"
+  type: "foscam-mjpeg"
+  params:
+    host: '192.168.1.100'
+    user: 'admin'
+    pass: 'admin'
+  timelapse: 2
+  frames_history: 20
+
+my_cam2:
+  name: "MyCam2"
+  type: "foscam-h264"
+  params:
+    host: '192.168.1.101'
+    user: 'admin'
+    pass: 'admin'
+  timelapse: 2
+  frames_history: 20

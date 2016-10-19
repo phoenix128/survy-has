@@ -1,0 +1,73 @@
+allowed_paths:
+  - "/storage"
+
+components:
+  app:
+    name: "App Manager"
+    class: "survy.core.components.app/AppManager"
+
+  webservice:
+    name: "Main Webservice"
+    class: "survy.core.components.ws/WebService"
+    params:
+      port: 8080
+
+  rule:
+    name: "Rules mnager"
+    class: "survy.core.components.rule/RuleManager"
+
+  runlevel:
+    name: "Runlevel manager"
+    class: "survy.core.components.runlevel/RunlevelManager"
+
+  tts:
+    name: "TTS Manager"
+    class: "survy.core.components.tts/TtsManager"
+    params:
+      festival_bin: "/usr/bin/festival"
+      voice: 'voice_pc_diphone'
+
+  telegram:
+    name: "Telegram Manager"
+    class: "survy.core.components.telegram/TelegramManager"
+
+  signal_usb_ook:
+    name: "USB OOK Radio adapter"
+    class: "survy.core.components.signals.usb_ook/SignalManagerUsbOOK"
+    params:
+      serial: "/dev/ttyUSB0"
+      baud: 115200
+      signals-interval: 1
+      anti-jamming-interval: 2
+
+  webclient:
+    name: "Web Client Manager"
+    class: "survy.core.components.webclient/WebClientManager"
+
+  cam:
+    name: "Cam"
+    class: "survy.core.components.cam/CamManager"
+    params:
+      capture_path: "/storage/ASMT-2115-01/survy"
+      snapshot_file: "%time_day%/snap_%code%_%time_ts%.jpg"
+      video_file: "%time_day%/video_%code%_%time_ts%.avi"
+      timelapse_file: "%time_day%/timelapse_%code%_%time_day%_%time_hour%.avi"
+      video_fourcc: "DIVX"
+      adapters:
+        foscam-mjpeg: "survy.core.components.cam_adapters.foscam/FoscamMjpegAdapter"
+        foscam-h264: "survy.core.components.cam_adapters.foscam/FoscamH264Adapter"
+        local: "survy.core.components.cam_adapters.local/LocalAdapter"
+        custom: "survy.core.components.cam_adapters.custom/CustomAdapter"
+
+  camstream:
+    name: "Cam Streaming"
+    class: "survy.core.components.camstream/CamStreamManager"
+    params:
+      address: 0.0.0.0
+      port: 8081
+
+  cron:
+    name: "Cron manager"
+    class: "survy.core.components.cron/CronManager"
+
+

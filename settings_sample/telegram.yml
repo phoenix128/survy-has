@@ -1,0 +1,5 @@
+token: 'MySecretToken'
+users:
+  - 'alloweduser1'
+  - 'alloweduser2'
+  - 'alloweduser3'
