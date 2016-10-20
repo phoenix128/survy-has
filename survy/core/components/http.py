@@ -25,7 +25,7 @@ class WebServiceReqHandler(BaseHTTPRequestHandler):
             component = m.group('component')
             task = m.group('task')
 
-            return WebService.get_instance().create_intercom_message(component, task, payload).send()
+            return HttpManager.get_instance().create_intercom_message(component, task, payload).send()
 
         return Reply(status=Reply.INTERCOM_STATUS_FAILURE, payload={'message': 'Incorrect format'})
 
@@ -42,15 +42,14 @@ class WebServiceReqHandler(BaseHTTPRequestHandler):
         self.wfile.write(bytes(json.dumps(res.get_payload()), 'utf-8'))
 
 
-class WebService(Component):
-    COMPONENT_TYPE = 'webservice'
+class HttpManager(Component):
+    COMPONENT_TYPE = 'http-manager'
     server = None
 
     def start(self):
         try:
-            self.server = HTTPServer(('', self._params['port']), WebServiceReqHandler)
+            self.server = HTTPServer((self._params['host'], self._params['port']), WebServiceReqHandler)
             self.server.serve_forever()
         except KeyboardInterrupt:
             if self.server is not None:
                 self.server.socket.close()
-

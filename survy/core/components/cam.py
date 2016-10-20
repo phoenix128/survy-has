@@ -1,3 +1,4 @@
+import copy
 import importlib
 import os
 import re
@@ -37,7 +38,7 @@ class Cam:
 
     cam_is_online = False
 
-    _current_url = None
+    _current_params = {}
     _current_type = None
 
     _frames_history = 0
@@ -123,10 +124,11 @@ class Cam:
         :return:
         """
 
+        self._lock.acquire()
         if self.image is None:
+            self._lock.release()
             return None
 
-        self._lock.acquire()
         file_name = self.get_capture_file(self.get_manager().get_snapshot_file_template())
         Log.info('Taking snapshot from "' + self.code + '": ' + file_name)
 
@@ -224,10 +226,11 @@ class Cam:
 
         while not self._stop:
             if self.timelapse > 0:
+                self._lock.acquire()
                 img = self.image
 
                 if img is not None:
-                    self._lock.acquire()
+
                     file_name = self.get_capture_file(self.get_manager().get_timelapse_file_template())
 
                     if file_name != last_file_name:
@@ -243,8 +246,8 @@ class Cam:
                     self._timelapse_video.write(img)
 
                     last_file_name = file_name
-                    self._lock.release()
 
+                self._lock.release()
                 time.sleep(self.timelapse)
 
             else:
@@ -253,7 +256,7 @@ class Cam:
     def _restart(self):
         self._lock.acquire()
 
-        self._current_url = self.url
+        self._current_params = copy.deepcopy(self.params)
         self._current_type = self.type
         self._old_frames_collection.clear()
 
@@ -283,7 +286,11 @@ class Cam:
         Reload camera settings trying to not break existing stream
         :return:
         """
-        if self._current_url != self.url or self._current_type != self.type:
+        if \
+            self._current_type != self.type or \
+                len(self._current_params) != len(self.params) or \
+                len(set(self._current_params.items()) & set(self.params.items())) != len(self.params.items()):
+
             self._restart()
 
     @property
@@ -306,6 +313,8 @@ class Cam:
             self.restart()
 
             while not self._stop:
+                self._lock.acquire()
+
                 rc = self._capture.grab()
                 if not rc:
                     if self.cam_is_online:
@@ -313,21 +322,20 @@ class Cam:
                         if self._image is not None:
                             self.decorate_image(self._image)
                         Log.error("Cam " + self.code + " off-line")
+                        self._lock.release()
                     break
 
                 self._new_frame = True
 
                 if self._recording_video:
-                    self._lock.acquire()
-
                     if self._recording_video:
                         self._current_video.write(self.image)
-
-                    self._lock.release()
 
                 if not self.cam_is_online:
                     self.cam_is_online = True
                     Log.info("Cam " + self.code + " on-line")
+
+                self._lock.release()
 
             self.cam_is_online = False
             if not self._stop:

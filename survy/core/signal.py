@@ -23,15 +23,18 @@ class SignalManager(Component):
     INTERCOM_MESSAGE_EVENT_SIGNAL_RECEIVED = 'signal-event-received'
     INTERCOM_MESSAGE_EVENT_SIGNAL_RECOGNIZED = 'signal-event-recognized'
     INTERCOM_MESSAGE_EVENT_LEARN_START = 'signal-event-learn-start'
+    INTERCOM_MESSAGE_EVENT_LEARN_FAIL = 'signal-event-learn-fail'
     INTERCOM_MESSAGE_EVENT_LEARN_NEW_SIGNAL = 'signal-event-learn-new-signal'
     INTERCOM_MESSAGE_EVENT_LEARN_END = 'signal-event-learn-end'
     INTERCOM_MESSAGE_DO_LEARN = 'signal-do-learn'
+    INTERCOM_MESSAGE_DO_FIRE = 'signal-do-fire'
 
+    LEARN_TIMEOUT = 10
     SIGNAL_RELAX_TIME = .1
 
     _learning_signal = None
     _last_learning_signal = None
-
+    _learn_timeout = None
     _free_channel_ts = None
 
     def _can_send_message(self):
@@ -75,6 +78,13 @@ class SignalManager(Component):
     def is_learning(self):
         return self._learning_signal is not None
 
+    def _on_learn_timeout(self):
+        if self._learning_signal is not None:
+            Log.info("Learning signal timeout")
+
+            self.send_intercom_message(self.INTERCOM_MESSAGE_EVENT_LEARN_FAIL, self._learning_signal.to_dict())
+            self._learning_signal = None
+
     def _on_learn_start(self, message: Message) -> Reply:
         payload = message.message_payload
 
@@ -86,6 +96,12 @@ class SignalManager(Component):
             sub_name=payload['sub'],
         )
 
+        if self._learn_timeout is not None:
+            self._learn_timeout.cancel()
+
+        self._learn_timeout = threading.Timer(interval=self.LEARN_TIMEOUT, function=self._on_learn_timeout)
+        self._learn_timeout.start()
+
         Log.info("Learning start: " + str(self._learning_signal))
         self.send_intercom_message(self.INTERCOM_MESSAGE_EVENT_LEARN_START, self._learning_signal.to_dict())
 
@@ -95,6 +111,19 @@ class SignalManager(Component):
         Log.info("Exiting learning mode")
 
         self._learning_signal = None
+        self._learn_timeout.cancel()
+        return Reply(Reply.INTERCOM_STATUS_SUCCESS)
+
+    def _on_do_fire(self, message: Message) -> Reply:
+        payload = message.message_payload
+        signal = SignalRepo.get_by_code(
+            device_code=payload['device'],
+            sub_code=payload['sub']
+        )
+        if signal is None:
+            return Reply(Reply.INTERCOM_STATUS_FAILURE)
+
+        signal.fire()
         return Reply(Reply.INTERCOM_STATUS_SUCCESS)
 
     def _on_intercom_message(self, message: Message) -> Reply:
@@ -103,6 +132,9 @@ class SignalManager(Component):
 
         if message == self.INTERCOM_MESSAGE_EVENT_LEARN_END:
             return self._on_learn_end()
+
+        if message == self.INTERCOM_MESSAGE_DO_FIRE:
+            return self._on_do_fire(message)
 
         return Component._on_intercom_message(self, message)
 
@@ -145,6 +177,10 @@ class Signal:
         self.set_sub_name(sub_name)
         self.set_sub_code(sub_code)
 
+    @classmethod
+    def filter_code(cls, value):
+        return re.sub(r'[\W\s]+', '_', value.lower())
+
     def set_manager(self, value: SignalManager):
         self._manager = value
 
@@ -156,12 +192,12 @@ class Signal:
 
     def set_device_code(self, value):
         if value is not None:
-            value = re.sub(r'[\W\s]+', '_', value.lower())
+            value = self.filter_code(value)
         self._device_code = value
 
     def set_sub_code(self, value):
         if value is not None:
-            value = re.sub(r'[\W\s]+', '_', value.lower())
+            value = self.filter_code(value)
         self._sub_code = value
 
     def set_code(self, value):
@@ -313,6 +349,9 @@ class SignalRepo:
         :param sub_code: Sub code
         :return: Identified signal from repo
         """
+
+        device_code = Signal.filter_code(device_code)
+        sub_code = Signal.filter_code(sub_code)
 
         cls.lazy_load()
         for s in cls._signals:

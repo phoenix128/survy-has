@@ -90,5 +90,5 @@ class CamStreamManager(Component):
     def start(self):
         Component.start(self)
 
-        self._server = CamThreadedHTTPServer((self._params['address'], int(self._params['port'])), CamStreamHandler)
+        self._server = CamThreadedHTTPServer((self._params['host'], int(self._params['port'])), CamStreamHandler)
         self._server.serve_forever()

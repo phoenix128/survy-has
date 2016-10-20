@@ -5,6 +5,8 @@ from survy.core.log import Log
 
 
 class Reply:
+    INTERCOM_MESSAGE_REPLY = 'reply'
+
     INTERCOM_STATUS_NOT_FOUND = 'not-found'
     INTERCOM_STATUS_SUCCESS = 'success'
     INTERCOM_STATUS_FAILURE = 'failure'
@@ -40,6 +42,7 @@ class Reply:
 
     def to_dict(self):
         return {
+            'message': self.INTERCOM_MESSAGE_REPLY,
             'status': self.get_status(),
             'payload': self.get_payload(),
         }
@@ -62,6 +65,14 @@ class Message:
         self.message_to = message_to
         self.message_type = message_type
         self.message_payload = message_payload
+
+    def to_dict(self):
+        return {
+            'message': self.message_type,
+            'from': self.message_from,
+            'to': self.message_to,
+            'payload': self.message_payload,
+        }
 
     def copy(self):
         return Message(

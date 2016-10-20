@@ -6,11 +6,19 @@ components:
     name: "App Manager"
     class: "survy.core.components.app/AppManager"
 
-  webservice:
-    name: "Main Webservice"
-    class: "survy.core.components.ws/WebService"
+  http:
+    name: "HTTP Request Manager"
+    class: "survy.core.components.http/HttpManager"
     params:
+      host: 0.0.0.0
       port: 8080
+
+  tcpsocket:
+    name: "Main TCP Socket Manager"
+    class: "survy.core.components.tcpsocket/TCPSocketManager"
+    params:
+      host: 0.0.0.0
+      port: 2006
 
   rule:
     name: "Rules mnager"
@@ -63,7 +71,7 @@ components:
     name: "Cam Streaming"
     class: "survy.core.components.camstream/CamStreamManager"
     params:
-      address: 0.0.0.0
+      host: 0.0.0.0
       port: 8081
 
   cron:
