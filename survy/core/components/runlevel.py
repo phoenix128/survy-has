@@ -23,7 +23,7 @@ class RunlevelManager(Component):
         return App.get_settings_path() + '/runlevel.yml'
 
     def _on_set_runlelvel(self, message: Message) -> Reply:
-        payload = message.get_message_payload()
+        payload = message.message_payload
 
         params_fail = self.check_required_parameters(payload, ['runlevel'])
         if params_fail:

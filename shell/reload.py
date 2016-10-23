@@ -7,7 +7,7 @@ from survy.core.client import Client
 from survy.core.component import Component
 
 client = Client()
-print(client.send(
+client.send(
     message_type=Component.INTERCOM_MESSAGE_DO_RELOAD,
     message_payload={}
-))
+)

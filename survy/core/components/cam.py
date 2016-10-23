@@ -133,11 +133,11 @@ class Cam:
         Log.info('Taking snapshot from "' + self.code + '": ' + file_name)
 
         cv2.imwrite(file_name, self.image)
+        self._lock.release()
 
         self.get_manager().send_intercom_message(CamManager.INTERCOM_MESSAGE_EVENT_SNAPSHOT, {
             'filename': file_name
         })
-        self._lock.release()
 
         return file_name
 
@@ -150,6 +150,7 @@ class Cam:
             self._lock.acquire()
             image = self.image
 
+            file_name = None
             if image is not None:
                 height, width, layers = image.shape
 
@@ -166,11 +167,12 @@ class Cam:
 
                 self._recording_video = True
 
+            self._lock.release()
+
+            if file_name is not None:
                 self.get_manager().send_intercom_message(CamManager.INTERCOM_MESSAGE_EVENT_VIDEO_START, {
                     'filename': file_name
                 })
-
-            self._lock.release()
 
         return self._current_video_file_name
 
@@ -188,11 +190,11 @@ class Cam:
             self._recording_video = False
             self._current_video_file_name = None
             self._current_video.release()
+            self._lock.release()
 
             self.get_manager().send_intercom_message(CamManager.INTERCOM_MESSAGE_EVENT_VIDEO_STOP, {
                 'filename': file_name
             })
-            self._lock.release()
 
             return file_name
 

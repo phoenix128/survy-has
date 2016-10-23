@@ -26,7 +26,7 @@ class TelegramManager(Component):
 
     INTERCOM_MESSAGE_DO_VIDEO_MESSAGE = 'telegram-do-video-message'
     INTERCOM_MESSAGE_DO_PHOTO_MESSAGE = 'telegram-do-photo-message'
-    INTERCOM_MESSAGE_DO_DOCUMENT_MESSAGE= 'telegram-do-document-message'
+    INTERCOM_MESSAGE_DO_DOCUMENT_MESSAGE = 'telegram-do-document-message'
 
     INTERCOM_MESSAGE_DO_CHAT_MESSAGE = 'telegram-do-chat-message'
     INTERCOM_MESSAGE_DO_SEND_CAM_SNAPSHOT = 'telegram-do-send-cam-snapshot'
@@ -128,8 +128,8 @@ class TelegramManager(Component):
             else:
                 Log.error('Unknown chat ID for user ' + recipient + ', please send a message to this bot')
 
-    def send_picture(self, file, caption=None, recipients=None):
-        if file is None:
+    def send_picture(self, file_name, caption=None, recipients=None):
+        if file_name is None:
             return
 
         try:
@@ -141,7 +141,7 @@ class TelegramManager(Component):
                 if chat_id is not None:
                     self.get_bot().sendPhoto(
                         chat_id=chat_id,
-                        photo=open(file, 'rb'),
+                        photo=open(file_name, 'rb'),
                         caption=caption
                     )
                 else:
@@ -199,7 +199,13 @@ class TelegramManager(Component):
                             from_component == CamManager.get_instance().get_code():
 
                 file_name = component_payload['payload']['filename']
-                self.send_picture(file_name, caption, recipients)
+
+                # Async upload
+                threading.Thread(target=self.send_picture, kwargs={
+                    'file_name': file_name,
+                    'caption': caption,
+                    'recipients': recipients,
+                }).start()
 
     def _send_cam_video(self, cam: Cam, recipients, duration):
         res = self.send_intercom_message(CamManager.INTERCOM_MESSAGE_DO_VIDEO_START, {
@@ -225,7 +231,13 @@ class TelegramManager(Component):
             if component_payload['status'] == Reply.INTERCOM_STATUS_SUCCESS and \
                             from_component == CamManager.get_instance().get_code():
                 file_name = component_payload['payload']['filename']
-                self.send_video(file_name, caption, recipients)
+
+                # Async upload
+                threading.Thread(target=self.send_video, kwargs={
+                    'file_name': file_name,
+                    'caption': caption,
+                    'recipients': recipients,
+                }).start()
 
     def _on_cam_action(self, message: Message) -> Reply:
         payload = message.message_payload
@@ -237,21 +249,21 @@ class TelegramManager(Component):
                 recipients = re.split(r'\s*,\s*', payload['to'])
 
             if message == self.INTERCOM_MESSAGE_DO_SEND_CAM_SNAPSHOT:
-                threading.Thread(target=self._send_cam_snapshot, kwargs={
-                    'cam': cam,
-                    'recipients': recipients
-                }).start()
+                self._send_cam_snapshot(
+                    cam=cam,
+                    recipients=recipients
+                )
 
             elif message == self.INTERCOM_MESSAGE_DO_SEND_CAM_VIDEO:
                 duration = 10
                 if 'duration' in message.message_payload:
                     duration = message.message_payload['duration']
 
-                threading.Thread(target=self._send_cam_video, kwargs={
-                    'cam': cam,
-                    'recipients': recipients,
-                    'duration': duration
-                }).start()
+                self._send_cam_video(
+                    cam=cam,
+                    recipients=recipients,
+                    duration=duration
+                )
 
         return Reply(Reply.INTERCOM_STATUS_SUCCESS)
 
@@ -288,7 +300,7 @@ class TelegramManager(Component):
             recipients = re.split(r'\s*,\s*', payload['to'])
 
         if message == self.INTERCOM_MESSAGE_DO_PHOTO_MESSAGE:
-            self.send_picture(file=filename, caption=caption, recipients=recipients)
+            self.send_picture(file_name=filename, caption=caption, recipients=recipients)
 
         elif message == self.INTERCOM_MESSAGE_DO_VIDEO_MESSAGE:
             self.send_video(file=filename, caption=caption, recipients=recipients)

@@ -167,14 +167,14 @@ class Action(Message):
 
     def _fire(self, variables, delay=0):
         time.sleep(delay)
-        Log.info('Firing action "' + self.message_type + '"')
-
         message_to_send = self.copy()
 
         payload = message_to_send.message_payload
         new_payload = Utils.replace_variables_dict(payload, variables)
 
         message_to_send.message_payload = new_payload
+        Log.info('Firing action "' + self.message_type + '" ')
+
         return message_to_send.send()
 
 

@@ -15,7 +15,7 @@ class TtsManager(Component):
     _sp = None
 
     def _on_say_text(self, message: Message):
-        payload = message.get_message_payload()
+        payload = message.message_payload
 
         params_fail = self.check_required_parameters(payload, ['text'])
         if params_fail:

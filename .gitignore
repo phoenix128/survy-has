@@ -1,4 +1,4 @@
 *.pyc
 .idea/
-settings/*.yml
+settings/
 config.yml

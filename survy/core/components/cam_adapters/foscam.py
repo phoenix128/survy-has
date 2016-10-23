@@ -17,6 +17,9 @@ class FoscamMjpegAdapter(CamAdapter):
         return 'http://' + params['host'] + '/videostream.cgi?' + url_values + '&.mjpg'
 
     def _decoder_control_command(self, command):
+        if not self.cam.cam_is_online:
+            return Reply(Reply.INTERCOM_STATUS_FAILURE)
+
         params = self.get_cam_params()
 
         data = {
