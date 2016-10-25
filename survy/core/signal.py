@@ -33,7 +33,6 @@ class SignalManager(Component):
     SIGNAL_RELAX_TIME = .1
 
     _learning_signal = None
-    _last_learning_signal = None
     _learn_timeout = None
     _free_channel_ts = None
 
@@ -49,10 +48,7 @@ class SignalManager(Component):
         self._delay_signal()
 
         if self.is_learning():
-            if signal == self._last_learning_signal:
-                self._learn_signal(signal)
-
-            self._last_learning_signal = signal
+            self._learn_signal(signal)
 
         else:
             self.send_intercom_message(SignalManager.INTERCOM_MESSAGE_EVENT_SIGNAL_RECEIVED, signal.to_dict())
