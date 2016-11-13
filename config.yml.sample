@@ -60,7 +60,7 @@ components:
       snapshot_file: "%time_day%/snap_%code%_%time_ts%.jpg"
       video_file: "%time_day%/video_%code%_%time_ts%.avi"
       timelapse_file: "%time_day%/timelapse_%code%_%time_day%_%time_hour%.avi"
-      video_fourcc: "DIVX"
+      timelapse_snap: "%time_day%/timelapse_%code%_%time_day%_%time_hour%/%n%.jpg"
       adapters:
         foscam-mjpeg: "survy.core.components.cam_adapters.foscam/FoscamMjpegAdapter"
         foscam-h264: "survy.core.components.cam_adapters.foscam/FoscamH264Adapter"
