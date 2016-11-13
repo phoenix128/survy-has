@@ -16,10 +16,18 @@ class FoscamMjpegAdapter(CamAdapter):
 
         return 'http://' + params['host'] + '/videostream.cgi?' + url_values + '&.mjpg'
 
-    def _decoder_control_command(self, command):
-        if not self.cam.cam_is_online:
-            return Reply(Reply.INTERCOM_STATUS_FAILURE)
+    def do_snapshot(self, file_name):
+        params = self.get_cam_params()
 
+        url_values = urllib.parse.urlencode({
+            'user': params['user'],
+            'pwd': params['pass'],
+        })
+
+        snapshot_url = 'http://' + params['host'] + '/snapshot.cgi?' + url_values
+        urllib.request.urlretrieve(snapshot_url, file_name)
+
+    def _decoder_control_command(self, command):
         params = self.get_cam_params()
 
         data = {
@@ -60,3 +68,15 @@ class FoscamH264Adapter(CamAdapter):
         params = self.get_cam_params()
 
         return 'rtsp://' + params['user'] + ':' + params['pass'] + '@' + params['host'] + '/videoMain'
+
+    def do_snapshot(self, file_name):
+        params = self.get_cam_params()
+
+        url_values = urllib.parse.urlencode({
+            'cmd': 'snapPicture2',
+            'usr': params['user'],
+            'pwd': params['pass'],
+        })
+
+        snapshot_url = 'http://' + params['host'] + '/CGIProxy.fcgi?' + url_values
+        urllib.request.urlretrieve(snapshot_url, file_name)

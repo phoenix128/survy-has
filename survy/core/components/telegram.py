@@ -80,11 +80,15 @@ class TelegramManager(Component):
             self._save_runtime()
 
     def get_variables(self):
-        return {
-            'telegram_bot_name': self.get_bot().username,
-            'telegram_bot_first_name': self.get_bot().first_name,
-            'telegram_bot_last_name': self.get_bot().last_name,
-        }
+        if self.get_bot() is not None:
+
+            return {
+                'telegram_bot_name': self.get_bot().username,
+                'telegram_bot_first_name': self.get_bot().first_name,
+                'telegram_bot_last_name': self.get_bot().last_name,
+            }
+        else:
+            return {}
 
     def load_settings(self):
         self._allowed_users = []
@@ -149,6 +153,9 @@ class TelegramManager(Component):
         except telegram.error.BadRequest:
             pass
 
+        except FileNotFoundError:
+            Log.error('File ' + file_name + ' not found')
+
     def send_video(self, file, caption=None, recipients=None):
         if file is None:
             return
@@ -170,6 +177,9 @@ class TelegramManager(Component):
                     Log.error('Unknown chat ID for user ' + recipient + ', please send a message to this bot')
         except telegram.error.BadRequest:
             pass
+
+        except FileNotFoundError:
+            Log.error('File ' + file + ' not found')
 
     send_document = send_video
 

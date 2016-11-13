@@ -3,7 +3,7 @@
 apt-get update
 apt-get upgrade
 
-apt-get install python3 python3-yaml screen python-opencv festival festvox-italp16k festvox-itapc16k
+apt-get install python3 python3-yaml screen festival festvox-italp16k festvox-itapc16k avconv
 pip3 install pyserial
 pip3 install imutils
 pip3 install numpy

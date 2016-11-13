@@ -7,14 +7,14 @@ mkdir opencv
 cd opencv
 
 pip3 install numpy
-apt-get install -yy build-essential cmake pkg-config
-apt-get install -yy libjpeg-dev libtiff5-dev libjasper-dev libpng12-dev
-apt-get install -yy libavcodec-dev libavformat-dev libswscale-dev libv4l-dev
-apt-get install -yy libxvidcore-dev libx264-dev
-apt-get install -yy libgtk2.0-dev
-apt-get install -yy libatlas-base-dev gfortran
-apt-get install -yy python3-dev
-apt-get install -yy libav-tools
+apt-get install -yy build-essential cmake pkg-config \
+    libjpeg-dev libtiff5-dev libjasper-dev libpng12-dev \
+    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
+    libxvidcore-dev libx264-dev libgtk2.0-dev \
+    libatlas-base-dev gfortran \
+    python3-dev \
+    libav-tools
+
 wget -O opencv_contrib.zip https://github.com/Itseez/opencv_contrib/archive/master.zip
 wget -O opencv.zip https://github.com/opencv/opencv/archive/master.zip
 #wget -O opencv_contrib.zip https://github.com/Itseez/opencv_contrib/archive/3.1.0.zip

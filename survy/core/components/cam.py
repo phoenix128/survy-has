@@ -1,17 +1,12 @@
-import copy
 import importlib
 import os
 import re
 import threading
-import collections
+
+from threading import Lock
 
 import time
-from threading import Lock
-from time import strftime, localtime
-
-import numpy
 import yaml
-import cv2
 
 from survy.core.app import App
 from survy.core.component import Component
@@ -36,43 +31,17 @@ class Cam:
     params = None
     adapter = None
 
-    cam_is_online = False
-
     _current_params = {}
     _current_type = None
 
-    _frames_history = 0
-    _old_frames_collection = None
-
-    _capture = None
-    _image = None
-    _new_frame = False
-
-    _current_video = None
-    _recording_video = False
-    _current_video_file_name = None
-
-    _lock = None
-
-    _timelapse_video = None
-
-    def __init__(self, code, name, cam_type, params, timelapse, frames_history=0):
-        self._old_frames_collection = collections.deque(maxlen=frames_history)
+    def __init__(self, code, name, cam_type, params, timelapse):
         self.code = code
         self.name = name
         self.type = cam_type
         self.params = params
         self.timelapse = timelapse
-        self.frames_history = frames_history
 
         self._lock = Lock()
-
-    @property
-    def url(self):
-        if self.adapter is None:
-            return None
-
-        return self.adapter.get_streaming_url()
 
     @property
     def timelapse(self):
@@ -81,14 +50,6 @@ class Cam:
     @timelapse.setter
     def timelapse(self, value):
         self._timelapse = int(value)
-
-    @property
-    def frames_history(self):
-        return int(self._frames_history)
-
-    @frames_history.setter
-    def frames_history(self, value):
-        self._frames_history = int(value)
 
     @property
     def code(self):
@@ -102,10 +63,13 @@ class Cam:
     def get_manager(self) -> CamManager:
         return CamManager.get_instance()
 
-    def get_capture_file(self, template):
-        template = Utils.replace_variables_text(template, {
-            'code': self.code
-        })
+    def get_capture_file(self, template, params=None):
+        if params is None:
+            params = {}
+
+        params['code'] = self.code
+
+        template = Utils.replace_variables_text(template, params)
 
         res = self.get_manager().get_capture_path() + '/' + template
         os.makedirs(os.path.dirname(res), 0o750, True)
@@ -113,7 +77,6 @@ class Cam:
 
     def on_cam_command(self, message: Message) -> Reply:
         if self.adapter is None:
-            print("NO adapter")
             return Reply(Reply.INTERCOM_STATUS_NOT_FOUND)
 
         return self.adapter.on_cam_command(message)
@@ -124,16 +87,10 @@ class Cam:
         :return:
         """
 
-        self._lock.acquire()
-        if self.image is None:
-            self._lock.release()
-            return None
-
         file_name = self.get_capture_file(self.get_manager().get_snapshot_file_template())
         Log.info('Taking snapshot from "' + self.code + '": ' + file_name)
 
-        cv2.imwrite(file_name, self.image)
-        self._lock.release()
+        self.adapter.do_snapshot(file_name)
 
         self.get_manager().send_intercom_message(CamManager.INTERCOM_MESSAGE_EVENT_SNAPSHOT, {
             'filename': file_name
@@ -146,142 +103,46 @@ class Cam:
         Start recording video
         :return:
         """
-        if not self._recording_video:
-            self._lock.acquire()
-            image = self.image
-
-            file_name = None
-            if image is not None:
-                height, width, layers = image.shape
-
-                file_name = self.get_capture_file(self.get_manager().get_video_file_template())
-                self._current_video_file_name = file_name
-                Log.info('Starting video for "' + self.code + '": ' + file_name)
-
-                fourcc = cv2.VideoWriter_fourcc(*self.get_manager().get_video_fourcc())
-                fps = self._capture.get(cv2.CAP_PROP_FPS)
-                self._current_video = cv2.VideoWriter(file_name, fourcc, fps, (width, height))
-
-                for old_img in self._old_frames_collection:
-                    self._current_video.write(old_img)
-
-                self._recording_video = True
-
-            self._lock.release()
-
-            if file_name is not None:
-                self.get_manager().send_intercom_message(CamManager.INTERCOM_MESSAGE_EVENT_VIDEO_START, {
-                    'filename': file_name
-                })
-
-        return self._current_video_file_name
+        pass
 
     def video_stop(self):
         """
         Stop recording video
         :return:
         """
-        if self._recording_video:
-            self._lock.acquire()
-            Log.info('Stopping video for "' + self.code + '"')
-
-            file_name = self._current_video_file_name
-
-            self._recording_video = False
-            self._current_video_file_name = None
-            self._current_video.release()
-            self._lock.release()
-
-            self.get_manager().send_intercom_message(CamManager.INTERCOM_MESSAGE_EVENT_VIDEO_STOP, {
-                'filename': file_name
-            })
-
-            return file_name
-
-        return None
-
-    def decorate_image(self, img):
-        height, width, layers = img.shape
-
-        if not self.cam_is_online:
-            rectangle = numpy.array([[0, 0], [width, 0], [width, height], [0, height]], numpy.int32)
-            cv2.fillPoly(img, [rectangle], 1)
-
-            cv2.putText(img, 'NO-SIGNAL',
-                        (15, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-        else:
-            rectangle = numpy.array([[0, height - 20], [0, height], [width, height], [width, height - 20]], numpy.int32)
-            cv2.fillPoly(img, [rectangle], 1)
-
-        cv2.putText(img, self.name,
-                    (10, height - 7),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-
-        cv2.putText(img, strftime("%Y/%m/%d %H:%M:%S", localtime()),
-                    (width - 155, height - 7),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        pass
 
     def start_timelapse(self):
         last_file_name = None
+        n = 0
 
         while not self._stop:
             if self.timelapse > 0:
-                self._lock.acquire()
-                img = self.image
+                file_name = self.get_capture_file(self.get_manager().get_timelapse_video_template())
 
-                if img is not None:
+                if file_name != last_file_name:
+                    n = 0
+                    Log.info('Starting new timelapse record for "' + self.code + '": ' + file_name)
 
-                    file_name = self.get_capture_file(self.get_manager().get_timelapse_file_template())
+                last_file_name = file_name
 
-                    if file_name != last_file_name:
-                        if self._timelapse_video is not None:
-                            self._timelapse_video.release()
+                snapshot_file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template(), {
+                    'n': str(n).zfill(6)
+                })
 
-                        height, width, layers = img.shape
-                        fourcc = cv2.VideoWriter_fourcc(*self.get_manager().get_video_fourcc())
+                self.adapter.do_snapshot(snapshot_file_name)
 
-                        Log.info('Starting new timelapse record for "' + self.code + '": ' + file_name)
-                        self._timelapse_video = cv2.VideoWriter(file_name, fourcc, 30, (width, height))
-
-                    self._timelapse_video.write(img)
-
-                    last_file_name = file_name
-
-                self._lock.release()
                 time.sleep(self.timelapse)
-
+                n += 1
             else:
                 time.sleep(1)
-
-    def _restart(self):
-        self._lock.acquire()
-
-        self._current_params = copy.deepcopy(self.params)
-        self._current_type = self.type
-        self._old_frames_collection.clear()
-
-        self.adapter = CamManager.get_instance().create_adapter_class(cam=self)
-        if self.adapter is None:
-            self._lock.release()
-            return
-
-        if self._capture is not None:
-            self._capture.release()
-
-        self._capture = cv2.VideoCapture(self.url)
-        self._capture.set(cv2.CAP_PROP_BUFFERSIZE, 5)
-
-        self._lock.release()
 
     def restart(self):
         """
         Try to restart camera
         :return:
         """
-        if not self.cam_is_online:
-            self._restart()
+        self.adapter = CamManager.get_instance().create_adapter_class(cam=self)
 
     def reload(self):
         """
@@ -293,74 +154,19 @@ class Cam:
                 len(self._current_params) != len(self.params) or \
                 len(set(self._current_params.items()) & set(self.params.items())) != len(self.params.items()):
 
-            self._restart()
-
-    @property
-    def image(self):
-        if self.cam_is_online and self._new_frame:
-            self._new_frame = False
-            rc, img = self._capture.retrieve()
-            if rc and img is not None:
-                self.decorate_image(img)
-                self._image = img
-
-        return self._image
-
-    def start_grabber(self):
-        """
-        Main frames grabbing cycle
-        :return:
-        """
-        while not self._stop:
             self.restart()
 
-            while not self._stop:
-                self._lock.acquire()
-
-                rc = self._capture.grab()
-                if not rc:
-                    if self.cam_is_online:
-                        self.cam_is_online = False
-                        if self._image is not None:
-                            self.decorate_image(self._image)
-                        Log.error("Cam " + self.code + " off-line")
-                        self._lock.release()
-                    break
-
-                self._new_frame = True
-
-                if self._recording_video:
-                    if self._recording_video:
-                        self._current_video.write(self.image)
-
-                if not self.cam_is_online:
-                    self.cam_is_online = True
-                    Log.info("Cam " + self.code + " on-line")
-
-                self._lock.release()
-
-            self.cam_is_online = False
-            if not self._stop:
-                time.sleep(self.CAM_RECONNECT_TIMEOUT)
-
     def start(self):
+        self.reload()
+
         if self.timelapse > 0:
             threading.Thread(target=self.start_timelapse).start()
-
-        threading.Thread(target=self.start_grabber).start()
 
     def stop(self):
         Log.info('Stopping cam ' + self.code)
 
         self.video_stop()
-
-        self._lock.acquire()
         self._stop = True
-        if self._timelapse_video is not None:
-            self._timelapse_video.release()
-        if self._capture is not None:
-            self._capture.release()
-        self._lock.release()
 
 
 class CamManager(Component):
@@ -422,11 +228,11 @@ class CamManager(Component):
     def get_snapshot_file_template(self):
         return self._params['snapshot_file']
 
-    def get_timelapse_file_template(self):
-        return self._params['timelapse_file']
+    def get_timelapse_video_template(self):
+        return self._params['timelapse_video']
 
-    def get_video_fourcc(self):
-        return self._params['video_fourcc']
+    def get_timelapse_snap_template(self):
+        return self._params['timelapse_snap']
 
     def create_adapter_class(self, cam):
         if cam.type not in self._params['adapters']:
@@ -476,11 +282,6 @@ class CamRepo:
         # Update / Create cams
         new_codes = []
         for cam_code, cam_info in cams.items():
-            if 'frames_history' in cam_info:
-                frames_history = int(cam_info['frames_history'])
-            else:
-                frames_history = 0
-
             # New cam
             if cam_code not in cls.cams:
                 cam = Cam(
@@ -488,8 +289,7 @@ class CamRepo:
                     name=cam_info['name'],
                     cam_type=cam_info['type'],
                     params=cam_info['params'],
-                    timelapse=cam_info['timelapse'],
-                    frames_history=frames_history
+                    timelapse=cam_info['timelapse']
                 )
                 threading.Thread(target=cam.start).start()
                 cls.cams[cam.code] = cam
@@ -501,7 +301,6 @@ class CamRepo:
                 cam.params = cam_info['params']
                 cam.type = cam_info['type']
                 cam.timelapse = cam_info['timelapse']
-                cam.frames_history = cam_info['frames_history']
                 cam.reload()
 
             new_codes.append(cam.code)
@@ -537,6 +336,9 @@ class CamAdapter:
         return self.cam.params
 
     def get_streaming_url(self):
+        return None
+
+    def do_snapshot(self, file_name):
         return None
 
     def on_cam_command(self, message: Message) -> Reply:
