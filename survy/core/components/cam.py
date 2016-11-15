@@ -1,3 +1,4 @@
+import glob
 import importlib
 import os
 import re
@@ -6,6 +7,8 @@ import threading
 from threading import Lock
 
 import time
+
+import sys
 import yaml
 
 from survy.core.app import App
@@ -64,6 +67,11 @@ class Cam:
         return CamManager.get_instance()
 
     def get_capture_file(self, template, params=None):
+        res = self.get_file_template(template, params)
+        os.makedirs(os.path.dirname(res), 0o750, True)
+        return res
+
+    def get_file_template(self, template, params=None):
         if params is None:
             params = {}
 
@@ -71,9 +79,7 @@ class Cam:
 
         template = Utils.replace_variables_text(template, params)
 
-        res = self.get_manager().get_capture_path() + '/' + template
-        os.makedirs(os.path.dirname(res), 0o750, True)
-        return res
+        return self.get_manager().get_capture_path() + '/' + template
 
     def on_cam_command(self, message: Message) -> Reply:
         if self.adapter is None:
@@ -112,23 +118,47 @@ class Cam:
         """
         pass
 
+    def _create_tl_videos(self):
+        path = self.get_file_template(self.get_manager().get_timelapse_snap_glob_template())
+        timelapses_path = glob.glob(path)
+
+        avconv = self.get_manager().get_avconv()
+
+        for tl_path in timelapses_path:
+            current_tl_file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template())
+            current_tl_path = os.path.dirname(current_tl_file_name)
+
+            if os.path.isdir(tl_path) and tl_path != current_tl_path:
+                Log.info('Creating timelapse for "' + current_tl_path + '"')
+                os.system(avconv + ' -y -r 10 -i ' + tl_path + '/%06d.jpg -q:v 0 ' + tl_path + '.avi')
+                os.system('rm -Rf ' + tl_path)
+
     def start_timelapse(self):
         last_file_name = None
         n = 0
 
         while not self._stop:
             if self.timelapse > 0:
-                file_name = self.get_capture_file(self.get_manager().get_timelapse_video_template())
+                file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template())
 
                 if file_name != last_file_name:
                     n = 0
                     Log.info('Starting new timelapse record for "' + self.code + '": ' + file_name)
 
+                    threading.Thread(target=self._create_tl_videos).start()
+
                 last_file_name = file_name
 
-                snapshot_file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template(), {
-                    'n': str(n).zfill(6)
-                })
+                snapshot_file_name = None
+                while True:
+                    snapshot_file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template(), {
+                        'n': str(n).zfill(6)
+                    })
+
+                    if os.path.exists(snapshot_file_name):
+                        n += 1
+                    else:
+                        break
 
                 self.adapter.do_snapshot(snapshot_file_name)
 
@@ -183,6 +213,14 @@ class CamManager(Component):
     INTERCOM_MESSAGE_EVENT_VIDEO_START = 'cam-event-video-start'
     INTERCOM_MESSAGE_EVENT_VIDEO_STOP = 'cam-event-video-stop'
 
+    # Do not change
+    TEMPLATE_SNAPSHOT_FILE = '%time_day%/snap_%code%_%time_ts%.jpg'
+    TEMPLATE_VIDEO_FILE = '%time_day%/video_%code%_%time_ts%.avi'
+    TEMPLATE_TL_VIDEO = '%time_day%/timelapse/%code%_%time_day%_%time_hour%.avi'
+    TEMPLATE_TL_SNAP = '%time_day%/timelapse/%code%_%time_day%_%time_hour%/%n%.jpg'
+
+    TEMPLATE_TL_SNAP_PATHS_GLOB = '%time_day%/timelapse/%code%_*'
+
     def _on_cam_action(self, message: Message) -> Reply:
         payload = message.message_payload
 
@@ -223,16 +261,22 @@ class CamManager(Component):
         return self._params['capture_path']
 
     def get_video_file_template(self):
-        return self._params['video_file']
+        return self.TEMPLATE_VIDEO_FILE
 
     def get_snapshot_file_template(self):
-        return self._params['snapshot_file']
+        return self.TEMPLATE_SNAPSHOT_FILE
 
     def get_timelapse_video_template(self):
-        return self._params['timelapse_video']
+        return self.TEMPLATE_TL_VIDEO
 
     def get_timelapse_snap_template(self):
-        return self._params['timelapse_snap']
+        return self.TEMPLATE_TL_SNAP
+
+    def get_timelapse_snap_glob_template(self):
+        return self.TEMPLATE_TL_SNAP_PATHS_GLOB
+
+    def get_avconv(self):
+        return self._params['avconv']
 
     def create_adapter_class(self, cam):
         if cam.type not in self._params['adapters']:
