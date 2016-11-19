@@ -85,6 +85,10 @@ class App:
         return cls.get_base_path() + '/settings'
 
     @classmethod
+    def get_assets_path(cls):
+        return cls.get_base_path() + '/assets'
+
+    @classmethod
     def get_sys_path(cls):
         return cls.get_base_path() + '/sys'
 

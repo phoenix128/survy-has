@@ -1,3 +1,4 @@
+import os
 import urllib.parse
 import urllib.request
 
@@ -26,6 +27,9 @@ class FoscamMjpegAdapter(CamAdapter):
 
         snapshot_url = 'http://' + params['host'] + '/snapshot.cgi?' + url_values
         urllib.request.urlretrieve(snapshot_url, file_name)
+
+        if os.path.exists(file_name):
+            self.decorate_image(file_name)
 
     def _decoder_control_command(self, command):
         params = self.get_cam_params()
@@ -80,3 +84,6 @@ class FoscamH264Adapter(CamAdapter):
 
         snapshot_url = 'http://' + params['host'] + '/CGIProxy.fcgi?' + url_values
         urllib.request.urlretrieve(snapshot_url, file_name)
+
+        if os.path.exists(file_name):
+            self.decorate_image(file_name)

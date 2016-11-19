@@ -7,8 +7,12 @@ import threading
 from threading import Lock
 
 import time
+from time import strftime, localtime
 
-import sys
+from PIL import ImageFont
+from PIL import Image
+from PIL import ImageDraw
+
 import yaml
 
 from survy.core.app import App
@@ -118,36 +122,40 @@ class Cam:
         """
         pass
 
-    def _create_tl_videos(self):
-        path = self.get_file_template(self.get_manager().get_timelapse_snap_glob_template())
-        timelapses_path = glob.glob(path)
+    def start_video_converter(self):
+        while not self._stop:
+            path = self.get_file_template(self.get_manager().get_timelapse_snap_glob_template())
+            timelapses_path = glob.glob(path)
+            avconv = self.get_manager().get_avconv()
 
-        avconv = self.get_manager().get_avconv()
+            for tl_path in timelapses_path:
+                current_tl_file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template())
+                current_tl_path = os.path.dirname(current_tl_file_name)
 
-        for tl_path in timelapses_path:
-            current_tl_file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template())
-            current_tl_path = os.path.dirname(current_tl_file_name)
+                if os.path.isdir(tl_path) and tl_path != current_tl_path:
+                    Log.info('Creating timelapse for "' + current_tl_path + '"')
 
-            if os.path.isdir(tl_path) and tl_path != current_tl_path:
-                Log.info('Creating timelapse for "' + current_tl_path + '"')
-                os.system(avconv + ' -y -r 10 -i ' + tl_path + '/%06d.jpg -q:v 0 ' + tl_path + '.avi')
-                os.system('rm -Rf ' + tl_path)
+                    cmd = avconv + ' -y -r 20 -i ' + tl_path + '/%06d.jpg -q:v 0 ' + tl_path + '.avi';
+
+                    if os.system(cmd) == 0:
+                        os.system('rm -Rf ' + tl_path)
+                    else:
+                        Log.error('Error running ' + cmd)
+
+            time.sleep(60)
 
     def start_timelapse(self):
-        last_file_name = None
+        last_will_video_file_name = None
         n = 0
 
         while not self._stop:
             if self.timelapse > 0:
-                file_name = self.get_capture_file(self.get_manager().get_timelapse_snap_template())
-
-                if file_name != last_file_name:
+                will_video_file_name = self.get_capture_file(self.get_manager().get_timelapse_video_template())
+                if will_video_file_name != last_will_video_file_name:
                     n = 0
-                    Log.info('Starting new timelapse record for "' + self.code + '": ' + file_name)
+                    Log.info('Starting new timelapse record for "' + self.code + '"')
 
-                    threading.Thread(target=self._create_tl_videos).start()
-
-                last_file_name = file_name
+                last_will_video_file_name = will_video_file_name
 
                 snapshot_file_name = None
                 while True:
@@ -192,6 +200,8 @@ class Cam:
         if self.timelapse > 0:
             threading.Thread(target=self.start_timelapse).start()
 
+        threading.Thread(target=self.start_video_converter).start()
+
     def stop(self):
         Log.info('Stopping cam ' + self.code)
 
@@ -216,10 +226,10 @@ class CamManager(Component):
     # Do not change
     TEMPLATE_SNAPSHOT_FILE = '%time_day%/snap_%code%_%time_ts%.jpg'
     TEMPLATE_VIDEO_FILE = '%time_day%/video_%code%_%time_ts%.avi'
-    TEMPLATE_TL_VIDEO = '%time_day%/timelapse/%code%_%time_day%_%time_hour%.avi'
-    TEMPLATE_TL_SNAP = '%time_day%/timelapse/%code%_%time_day%_%time_hour%/%n%.jpg'
+    TEMPLATE_TL_VIDEO = '%time_day%/timelapse/%time_day%_%time_hour%-%code%.avi'
+    TEMPLATE_TL_SNAP = '%time_day%/timelapse/%time_day%_%time_hour%-%code%/%n%.jpg'
 
-    TEMPLATE_TL_SNAP_PATHS_GLOB = '%time_day%/timelapse/%code%_*'
+    TEMPLATE_TL_SNAP_PATHS_GLOB = '*/timelapse/*-%code%'
 
     def _on_cam_action(self, message: Message) -> Reply:
         payload = message.message_payload
@@ -372,15 +382,29 @@ class CamRepo:
 class CamAdapter:
     TYPE = 'unknown'
     cam = None
+    font = None
 
     def __init__(self, cam: Cam):
         self.cam = cam
+        self.font = ImageFont.truetype(App.get_assets_path() + '/ttf/cam.ttf', 12)
 
     def get_cam_params(self):
         return self.cam.params
 
     def get_streaming_url(self):
         return None
+
+    def decorate_image(self, file_name):
+        im = Image.open(file_name)
+        width, height = im.size
+
+        dr = ImageDraw.Draw(im)
+        dr.rectangle(((0, height - 20), (width, height)), fill="black", outline="black")
+
+        dr.text((10, height - 18), self.cam.name, (255, 255, 255), font=self.font)
+        dr.text((width - 115, height - 18), strftime("%Y/%m/%d %H:%M:%S", localtime()), (255, 255, 255), font=self.font)
+
+        im.save(file_name)
 
     def do_snapshot(self, file_name):
         return None
