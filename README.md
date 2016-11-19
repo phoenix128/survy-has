@@ -83,5 +83,11 @@ You only need all this stuffs **if you are going to interface an existing home a
 If you just need something **like a video surveillance** system or a fully IP based solution, then you just need a **Raspberry PI** or an **old PC** 
 
 ## How to assemble
- 
+
 TODO... (work in progress)
+
+At the end it will look like this:
+
+<img src="https://raw.githubusercontent.com/phoenix128/survy-has/master/pics/proto.jpg" />
+
+Of course you can do a better job than mine ;)
