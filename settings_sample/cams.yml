@@ -6,6 +6,7 @@ my_cam:
     user: 'admin'
     pass: 'admin'
   timelapse: 2
+  history: 48
 
 my_cam2:
   name: "MyCam2"
@@ -15,3 +16,4 @@ my_cam2:
     user: 'admin'
     pass: 'admin'
   timelapse: 2
+  history: 48

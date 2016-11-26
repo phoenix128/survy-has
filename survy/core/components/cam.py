@@ -9,6 +9,7 @@ from threading import Lock
 import time
 from time import strftime, localtime
 
+import sys
 from PIL import ImageFont
 from PIL import Image
 from PIL import ImageDraw
@@ -32,6 +33,7 @@ class Cam:
     _stop = False
     _code = None
     _timelapse = None
+    history = None
     name = None
     url = None
     type = None
@@ -41,12 +43,13 @@ class Cam:
     _current_params = {}
     _current_type = None
 
-    def __init__(self, code, name, cam_type, params, timelapse):
+    def __init__(self, code, name, cam_type, params, timelapse, history):
         self.code = code
         self.name = name
         self.type = cam_type
         self.params = params
         self.timelapse = timelapse
+        self.history = history
 
         self._lock = Lock()
 
@@ -122,6 +125,21 @@ class Cam:
         """
         pass
 
+    def clear_old_records(self):
+        path = self.get_file_template(self.get_manager().get_timelapse_video_glob_template())
+        timelapses_path = glob.glob(path)
+        timelapses_path.sort()
+
+        for i in range(0, len(timelapses_path) - self.history):
+            Log.info("Clearing timelapse "+timelapses_path[i])
+
+            os.remove(timelapses_path[i])
+            try:
+                os.rmdir(os.path.dirname(timelapses_path[i]))
+            except:
+                # Directory not empty, we will not delete it
+                pass
+
     def start_video_converter(self):
         while not self._stop:
             path = self.get_file_template(self.get_manager().get_timelapse_snap_glob_template())
@@ -137,14 +155,17 @@ class Cam:
 
                     cmd = avconv + ' -y -r 20 -i ' + tl_path + '/%06d.jpg -q:v 0 ' + tl_path + '.avi';
 
-                    if os.system(cmd) == 0:
-                        os.system('rm -Rf ' + tl_path)
-                    else:
+                    if os.system(cmd) != 0:
                         Log.error('Error running ' + cmd)
+
+                    os.system('rm -Rf ' + tl_path)
+                    self.clear_old_records()
 
             time.sleep(60)
 
     def start_timelapse(self):
+        self.clear_old_records()
+
         last_will_video_file_name = None
         n = 0
 
@@ -230,6 +251,7 @@ class CamManager(Component):
     TEMPLATE_TL_SNAP = '%time_day%/timelapse/%time_day%_%time_hour%-%code%/%n%.jpg'
 
     TEMPLATE_TL_SNAP_PATHS_GLOB = '*/timelapse/*-%code%'
+    TEMPLATE_TL_VIDEO_PATHS_GLOB = '*/timelapse/*-%code%.avi'
 
     def _on_cam_action(self, message: Message) -> Reply:
         payload = message.message_payload
@@ -284,6 +306,9 @@ class CamManager(Component):
 
     def get_timelapse_snap_glob_template(self):
         return self.TEMPLATE_TL_SNAP_PATHS_GLOB
+
+    def get_timelapse_video_glob_template(self):
+        return self.TEMPLATE_TL_VIDEO_PATHS_GLOB
 
     def get_avconv(self):
         return self._params['avconv']
@@ -343,7 +368,8 @@ class CamRepo:
                     name=cam_info['name'],
                     cam_type=cam_info['type'],
                     params=cam_info['params'],
-                    timelapse=cam_info['timelapse']
+                    timelapse=cam_info['timelapse'],
+                    history=cam_info['history'],
                 )
                 threading.Thread(target=cam.start).start()
                 cls.cams[cam.code] = cam
