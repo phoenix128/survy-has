@@ -190,9 +190,11 @@ class Cam:
                         break
 
                 self.adapter.do_snapshot(snapshot_file_name)
+                if os.path.exists(snapshot_file_name):
+                    n += 1
 
                 time.sleep(self.timelapse)
-                n += 1
+
             else:
                 time.sleep(1)
 

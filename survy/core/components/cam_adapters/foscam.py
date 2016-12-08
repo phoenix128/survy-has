@@ -73,6 +73,35 @@ class FoscamH264Adapter(CamAdapter):
 
         return 'rtsp://' + params['user'] + ':' + params['pass'] + '@' + params['host'] + '/videoMain'
 
+    def _control_command(self, data):
+        params = self.get_cam_params()
+
+        data['usr'] = params['user']
+        data['pwd'] = params['pass']
+
+        url = 'http://' + params['host'] + '/CGIProxy.fcgi?' + urllib.parse.urlencode(data)
+
+        req = urllib.request.Request(url)
+        res = urllib.request.urlopen(req).read().decode("utf-8")
+
+        if '<result>0</result>' in res:
+            return Reply(Reply.INTERCOM_STATUS_SUCCESS)
+
+        return Reply(Reply.INTERCOM_STATUS_FAILURE)
+
+    def _on_cam_command_go_preset(self, message: Message) -> Reply:
+        payload = message.message_payload
+
+        if 'position' in payload:
+            params = {
+                'cmd': 'ptzGotoPresetPoint',
+                'name': payload['position'],
+            }
+
+            return self._control_command(params)
+
+        return Reply(Reply.INTERCOM_STATUS_FAILURE)
+
     def do_snapshot(self, file_name):
         params = self.get_cam_params()
 
@@ -87,3 +116,9 @@ class FoscamH264Adapter(CamAdapter):
 
         if os.path.exists(file_name):
             self.decorate_image(file_name)
+
+    def on_cam_command(self, message: Message) -> Reply:
+        if message == CamManager.INTERCOM_MESSAGE_DO_COMMAND_GO_PRESET:
+            return self._on_cam_command_go_preset(message)
+
+        return CamAdapter.on_cam_command(self, message)
