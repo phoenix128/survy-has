@@ -26,7 +26,11 @@ class FoscamMjpegAdapter(CamAdapter):
         })
 
         snapshot_url = 'http://' + params['host'] + '/snapshot.cgi?' + url_values
-        urllib.request.urlretrieve(snapshot_url, file_name)
+        try:
+            urllib.request.urlretrieve(snapshot_url, file_name)
+        except:
+            if os.path.exists(file_name):
+                os.remove(file_name)
 
         if os.path.exists(file_name):
             self.decorate_image(file_name)
@@ -40,12 +44,15 @@ class FoscamMjpegAdapter(CamAdapter):
             'command': str(command)
         }
 
-        url = 'http://' + params['host'] + '/decoder_control.cgi?' + urllib.parse.urlencode(data)
-        req = urllib.request.Request(url)
-        res = urllib.request.urlopen(req).read().decode("utf-8")
+        try:
+            url = 'http://' + params['host'] + '/decoder_control.cgi?' + urllib.parse.urlencode(data)
+            req = urllib.request.Request(url)
+            res = urllib.request.urlopen(req).read().decode("utf-8")
 
-        if 'ok.' in res:
-            return Reply(Reply.INTERCOM_STATUS_SUCCESS)
+            if 'ok.' in res:
+                return Reply(Reply.INTERCOM_STATUS_SUCCESS)
+        except:
+            pass
 
         return Reply(Reply.INTERCOM_STATUS_FAILURE)
 
@@ -81,11 +88,14 @@ class FoscamH264Adapter(CamAdapter):
 
         url = 'http://' + params['host'] + '/CGIProxy.fcgi?' + urllib.parse.urlencode(data)
 
-        req = urllib.request.Request(url)
-        res = urllib.request.urlopen(req).read().decode("utf-8")
+        try:
+            req = urllib.request.Request(url)
+            res = urllib.request.urlopen(req).read().decode("utf-8")
 
-        if '<result>0</result>' in res:
-            return Reply(Reply.INTERCOM_STATUS_SUCCESS)
+            if '<result>0</result>' in res:
+                return Reply(Reply.INTERCOM_STATUS_SUCCESS)
+        except:
+            pass
 
         return Reply(Reply.INTERCOM_STATUS_FAILURE)
 
@@ -111,8 +121,12 @@ class FoscamH264Adapter(CamAdapter):
             'pwd': params['pass'],
         })
 
-        snapshot_url = 'http://' + params['host'] + '/CGIProxy.fcgi?' + url_values
-        urllib.request.urlretrieve(snapshot_url, file_name)
+        try:
+            snapshot_url = 'http://' + params['host'] + '/CGIProxy.fcgi?' + url_values
+            urllib.request.urlretrieve(snapshot_url, file_name)
+        except:
+            if os.path.exists(file_name):
+                os.remove(file_name)
 
         if os.path.exists(file_name):
             self.decorate_image(file_name)
